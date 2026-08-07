@@ -7,6 +7,14 @@ const pool = require('./database');
 const app = express();
 app.use(express.json());
 
+app.get("/", (req, res)=>{      
+    res.json(
+        {
+            message: "Automated Shaded Sheet Checker System"
+        }
+    );
+});
+
 const PORT = 8080
 app.listen(PORT, ()=>{
     console.log(`SERVER IS RUNNING ON PORT ${PORT}`);
