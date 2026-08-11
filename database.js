@@ -20,4 +20,9 @@ pool.connect((err, client, release) => {
   release();
 });
 
+export async function getUsers(){
+    const result = await pool.query(`SELECT * FROM user_info ui JOIN users u ON u.uid=ui.uid `)
+    return result.rows
+}
+
 export default pool;

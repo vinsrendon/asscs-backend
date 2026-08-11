@@ -10,7 +10,7 @@ app.use(express.json());
 app.get("/", (req, res)=>{      
     res.json(
         {
-            message: "Automated Shaded Sheet Checker System"
+            message: "Automated Shaded Sheet Checker System API"
         }
     );
 });
@@ -19,3 +19,7 @@ const PORT = 8080
 app.listen(PORT, ()=>{
     console.log(`SERVER IS RUNNING ON PORT ${PORT}`);
 });
+
+const userRouter = require("./routes/users.js")
+
+app.use(userRouter)
