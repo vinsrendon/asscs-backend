@@ -17,7 +17,7 @@ app.get("/", (req, res)=>{
 
 const PORT = 8080
 app.listen(PORT, ()=>{
-    console.log(`SERVER IS RUNNING ON PORT ${PORT}`);
+    console.log(`SERVER IS RUNNING ON http://localhost:${PORT}`);
 });
 
 const userRouter = require("./routes/users.js")

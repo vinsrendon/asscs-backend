@@ -7,7 +7,7 @@ const dotenv = require('dotenv')
 
 dotenv.config()
 
-const  { getUsers} = require('../database.js')
+const  { getUsers, registerUser} = require('../database.js')
 
 router.get('/users', async (req,res) => {
     // const token = req.cookies.token;
@@ -15,11 +15,36 @@ router.get('/users', async (req,res) => {
         // const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
         const users = await getUsers()
         // const filteredUsers = users.filter(user => user.uid !== decoded.id);
-        return res.status(200).json(users);
+        if (users.length === 0) {
+            return res.status(200).json("NO USERS FOUND");
+        } else {
+            return res.status(200).json(users);
+        }        
     } 
     catch (err) {      
         return res.status(500).json({ message: "Unexpected Error occurred",error:err });
     }    
+})
+
+router.post("/register", async (req,res) => {
+    const {email,password} = req.body   
+    // return res.status(200).json(res.body)
+    
+    if (!email || !password) {
+        return res.status(422).json({message: "Fill all necessary fields." })
+    }       
+
+    try {
+        const hash = await bcrypt.hash(password,13) 
+
+        await registerUser(email,hash)
+        
+        return res.status(200).json({message: "REGISTERED SUCCESSFULLY"})
+    } catch (error) {
+        if(error.code === "ER_DUP_ENTRY") return res.status(409).json({message: "USERNAME ALREADY EXIST"})
+        
+        else return res.status(500).json({message: "ERROR", error})        
+    }
 })
 
 module.exports = router
