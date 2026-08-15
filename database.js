@@ -53,4 +53,14 @@ export async function registerUser(fname,mname,lname,course,role,phone,email,pas
     }
 }
 
+export async function loginUser(user){    
+    const result = await pool.query('SELECT * from public.users WHERE email = $1',[user])
+    return result.rows
+}
+
+export async function getUserById(uid){    
+    const result = await pool.query(`SELECT * FROM users_info ui JOIN users u ON u.uid=ui.uid WHERE u.uid = $1`,[uid])    
+    return result.rows
+}
+
 export default pool;
