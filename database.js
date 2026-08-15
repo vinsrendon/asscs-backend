@@ -22,32 +22,32 @@ pool.connect((err, client, release) => {
 
 // USERS
 export async function getUsers(){
-    const result = await pool.query(`SELECT * FROM user_info ui JOIN users u ON u.uid=ui.uid `)
+    const result = await pool.query(`SELECT * FROM users_info ui JOIN users u ON u.uid=ui.uid `)
     return result.rows
 }
 
-export async function registerUser(email,pass){     
+export async function registerUser(fname,mname,lname,course,role,phone,email,password){     
     const conn = await pool.connect()
 
     try {
         await conn.query('BEGIN');
 
         const userResult = await conn.query(`
-            INSERT INTO users (uid, email, password, role, status, created_at) 
-            VALUES (DEFAULT, $1, $2, $3, $4,DEFAULT) RETURNING uid`, 
-            [email, pass, 'PENDING', 'PENDING'])
+            INSERT INTO users(email, password, role, status) 
+            VALUES ($1, $2, $3, $4) RETURNING uid`, 
+            [email, password, role, 'PENDING'])
 
         const newUserId = userResult.rows[0].uid
 
         await conn.query(`
-            INSERT INTO user_info (uid, fname, lname)
-            VALUES ($1, $2, $3)`, 
-            [newUserId, '', ''])
+            INSERT INTO users_info(uid, fname, mname, lname, course, phone)
+            VALUES ($1, $2, $3, $4, $5, $6)`, 
+            [newUserId, fname,mname,lname,course,phone])
 
         await conn.query('COMMIT');
     } catch (err) {
         await conn.query('ROLLBACK');
-        throw err
+        throw err        
     } finally {
         conn.release()
     }
