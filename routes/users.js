@@ -33,6 +33,10 @@ router.post("/register", async (req,res) => {
         return res.status(422).json({message: "Fill all necessary fields." })
     }       
 
+    if(role === "STUDENT" && !course){
+        return res.status(422).json({message: "Student missing course." })
+    }
+
     try {
         const hash = await bcrypt.hash(password,13) 
 
