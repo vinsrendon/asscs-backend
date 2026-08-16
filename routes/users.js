@@ -114,4 +114,27 @@ router.get("/verify",verifyToken, (req, res) => {
     return res.status(200).json({message: "user verified", user: decoded});
 });
 
+router.post("/logout", (req, res) => {
+    const cookiesToClear = ["token"];
+
+    clearCookies(res, cookiesToClear);
+    
+    return res.status(200).json({ message: "Logged out" });
+});
+
+function clearCookies(res, cookieNames) {
+    const isDev = process.env.MODE === 'DEV'    
+    
+    const cookieOptions = {
+        httpOnly: true,
+        secure: !isDev,
+        sameSite: isDev ? "lax" : "none",
+        partitioned: !isDev,        
+    };
+
+    cookieNames.forEach(name => {
+        res.clearCookie(name, cookieOptions);
+    });
+}
+
 module.exports = router
