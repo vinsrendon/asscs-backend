@@ -10,11 +10,11 @@ dotenv.config()
 const  { getUsers, registerUser, loginUser, getUserById} = require('../database.js')
 
 router.get('/users', async (req,res) => {
-    // const token = req.cookies.token;
+    const token = req.cookies.token;
     try {
-        // const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
         const users = await getUsers()
-        // const filteredUsers = users.filter(user => user.uid !== decoded.id);
+        const filteredUsers = users.filter(user => user.uid !== decoded.id);
         if (users.length === 0) {
             return res.status(200).json("NO USERS FOUND");
         } else {
