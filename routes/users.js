@@ -27,8 +27,8 @@ router.get('/users', async (req,res) => {
 })
 
 router.post("/register", async (req,res) => {
-    const {firstname,middlename,lastname,course,role,phone,email,password} = req.body
-    
+    const {firstname,middlename,lastname,course,role,phone,email,password,status} = req.body
+ 
     if (!firstname || !lastname|| !role || !phone|| !email || !password) {
         return res.status(422).json({message: "Fill all necessary fields." })
     }       
@@ -40,7 +40,7 @@ router.post("/register", async (req,res) => {
     try {
         const hash = await bcrypt.hash(password,13) 
 
-        await registerUser(firstname,middlename,lastname,course,role,phone,email,hash)
+        await registerUser(firstname,middlename,lastname,course,role,phone,email,hash,status)
         
         return res.status(200).json({message: "REGISTERED SUCCESSFULLY"})
     } catch (error) {
@@ -49,6 +49,7 @@ router.post("/register", async (req,res) => {
         else return res.status(500).json({message: "ERROR", error})     
     }
 })
+
 
 router.post("/login" , async (req,res) => {
     const {email,password} = req.body    
