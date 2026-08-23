@@ -98,4 +98,9 @@ export async function getUserById(uid){
     return result.rows
 }
 
+export async function editUser(query,values){
+    const result = await pool.query(query, values)
+    return result
+}
+
 export default pool
