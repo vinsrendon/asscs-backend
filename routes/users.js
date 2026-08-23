@@ -118,7 +118,7 @@ router.get("/verify",verifyToken, (req, res) => {
     return res.status(200).json({message: "user verified", user: decoded})
 })
 
-router.post("/logout",verifyToken, (req, res) => {
+router.post("/logout", (req, res) => {
     const cookiesToClear = ["token"]
 
     clearCookies(res, cookiesToClear)
