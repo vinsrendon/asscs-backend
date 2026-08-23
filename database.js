@@ -33,8 +33,8 @@ export async function registerUser(fname,mname,lname,course,role,phone,email,pas
     
     try {
         if (role === 'STUDENT') {
-            sid = await generateStudentId();
-            // console.log(sid);            
+            sid = await generateStudentId()
+            // console.log(sid)            
         }
 
         await conn.query('BEGIN')
@@ -85,7 +85,7 @@ async function generateStudentId(){
         sequence = (lastStudentId % 10000) + 1
     }
 
-    return year * 10000 + sequence;
+    return year * 10000 + sequence
 }
 
 export async function loginUser(user){    
@@ -102,5 +102,15 @@ export async function editUser(query,values){
     const result = await pool.query(query, values)
     return result
 }
+
+// export async function startConversation(userId,prompt){
+//     const convRes = await pool.query('INSERT INTO conversations (user_id, title) VALUES ($1, $2) RETURNING id',
+//         [userId, prompt])
+//     return convRes
+// }
+
+// export async function saveModelResponse(){
+
+// }
 
 export default pool

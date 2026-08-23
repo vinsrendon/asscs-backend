@@ -42,5 +42,7 @@ app.listen(PORT, ()=>{
 });
 
 const userRouter = require("./routes/users.js")
+const chatbotRouter = require("./routes/chatbot.js")
 
 app.use(userRouter)
+app.use(chatbotRouter)
