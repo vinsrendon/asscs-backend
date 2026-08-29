@@ -103,14 +103,14 @@ export async function editUser(query,values){
     return result
 }
 
-// export async function startConversation(userId,prompt){
-//     const convRes = await pool.query('INSERT INTO conversations (user_id, title) VALUES ($1, $2) RETURNING id',
-//         [userId, prompt])
-//     return convRes
-// }
+export async function getChatConversationById(uid){    
+    const result = await pool.query(`SELECT c.id,c.uid,c.title FROM conversations c WHERE c.uid = $1 ORDER BY created_at DESC`,[uid])    
+    return result.rows
+}
 
-// export async function saveModelResponse(){
-
-// }
+export async function getMessageById(id){    
+    const result = await pool.query(`SELECT * FROM messages m WHERE m.conversation_id = $1 ORDER BY created_at ASC`,[id])    
+    return result.rows
+}
 
 export default pool
