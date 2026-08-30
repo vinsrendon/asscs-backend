@@ -17,8 +17,36 @@ const pool = new Pool({
 })
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+const ai_model = process.env.GEMINI_MODEL
 
 const  {getChatConversationById, getMessageById} = require('../database.js')
+
+router.get('/api/chat/health', async (req, res) => {
+  try {
+    const response = await ai.models.generateContent({
+      model: ai_model.toString(),
+      contents: 'ping',
+    })
+
+    if (response && response.text) {
+      return res.status(200).json({
+        status: 'online',
+        provider: 'Gemini API',
+        message: 'AI Chatbot is responsive.',
+      })
+    } else {
+      throw new Error('Empty response from AI model')
+    }
+  } catch (error) {
+    console.error('AI Health Check Failed:', error.message)
+    return res.status(503).json({
+      status: 'offline',
+      provider: 'Gemini API',
+      message: 'AI Chatbot service is currently unavailable.',
+      error: error.message,
+    })
+  }
+})
 
 router.post('/api/chat/stream',verifyToken, async (req, res) => {
     const {conversationId, prompt } = req.body
@@ -61,7 +89,7 @@ router.post('/api/chat/stream',verifyToken, async (req, res) => {
         }))
 
         const responseStream = await ai.models.generateContentStream({
-        model: 'gemini-3.5-flash-lite',
+        model: ai_model.toString(),
         contents: contents,
         config: {
             systemInstruction: `You are an AI academic assistant that can analyze exam scores, find weakest subjects, or suggest study topicsfor our platform. Automated Shaded Sheet Chatbot System with chatbot. 
@@ -148,14 +176,13 @@ async function generateTitleFromMessages(messages) {
     ${conversationTranscript}`
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
+        model: ai_model.toString(),
         contents: prompt,
     })
 
     
     return response.text.trim().replace(/^["']|["']$/g, '')
 }
-
 
 async function generateTitle(conversationId){    
     if (!conversationId) {
