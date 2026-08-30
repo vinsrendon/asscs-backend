@@ -14,3 +14,19 @@ ALLOW_ORIGINS=
 
 GEMINI_API_KEY=
 GEMINI_MODEL=
+
+
+1. Install mkcert
+winget install FiloSottile.mkcert
+
+2. Install the local CA
+mkcert -install
+
+3. Get your PC's local IP
+ipconfig
+
+4. Generate a certificate
+In your React project, create a folder: cert
+
+Then run:
+mkcert localhost 127.0.0.1 192.168.1.100
