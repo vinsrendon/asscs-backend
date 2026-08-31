@@ -29,4 +29,4 @@ ipconfig
 In your React project, create a folder: cert
 
 Then run:
-mkcert localhost 127.0.0.1 192.168.1.100
+mkcert localhost 127.0.0.1 [SERVER IP]
