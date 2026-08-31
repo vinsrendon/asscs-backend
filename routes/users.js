@@ -9,19 +9,40 @@ dotenv.config()
 
 const  { getUsers, registerUser, loginUser, getUserById, editUser} = require('../database.js')
 
-router.get('/users',verifyToken, async (req,res) => {
-    const token = req.cookies.token
+// router.get('/users',verifyToken, async (req,res) => {
+//     const token = req.cookies.token
+//     try {
+//         const users = await getUsers()
+//         if (users.length === 0) {
+//             return res.status(200).json("NO USERS FOUND")
+//         } else {
+//             return res.status(200).json(users)
+//         }        
+//     } 
+//     catch (err) {      
+//         return res.status(500).json({ message: "Unexpected Error occurred",error:err })
+//     }    
+// })
+router.get('/users', verifyToken, async (req, res) => {
     try {
-        const users = await getUsers()
-        if (users.length === 0) {
-            return res.status(200).json("NO USERS FOUND")
-        } else {
-            return res.status(200).json(users)
-        }        
-    } 
-    catch (err) {      
-        return res.status(500).json({ message: "Unexpected Error occurred",error:err })
-    }    
+        const page = parseInt(req.query.page) || 1
+        const limit = parseInt(req.query.limit) || 10
+        const search = req.query.search || ''
+        const filter = req.query.filter || 'all'
+
+        if (page < 1 || limit < 1 || limit > 100) {
+        return res.status(400).json({ message: "Invalid page or limit" })
+        }
+
+        const result = await getUsers({ page, limit, search, filter })
+
+        return res.status(200).json(result)
+    } catch (err) {
+        return res.status(500).json({ 
+            message: "Unexpected Error occurred", 
+            error: err.message 
+        })
+    }
 })
 
 router.post("/register", async (req,res) => {

@@ -20,10 +20,68 @@ pool.connect((err, client, release) => {
   release()
 })
 
-// USERS
-export async function getUsers(){
-    const result = await pool.query(`SELECT * FROM users_info ui JOIN users u ON u.uid=ui.uid `)
-    return result.rows
+export async function getUsers({page = 1,limit = 10,search = '',filter = 'all'} = {}){
+    const offset = (page - 1) * limit
+    const values = []
+    let where = []
+    let paramIndex = 1
+
+    if (filter === 'teachers') {
+        where.push(`UPPER(u.role::text) = $${paramIndex++}`)
+        values.push('TEACHER')
+    } else if (filter === 'students') {
+        where.push(`UPPER(u.role::text) = $${paramIndex++}`)
+        values.push('STUDENT')
+    } else if (filter === 'pendings') {
+        where.push(`UPPER(u.status::text) = $${paramIndex++}`)
+        values.push('PENDING')
+    }
+
+    if (search.trim()) {
+        where.push(`(
+            LOWER(ui.fname) LIKE $${paramIndex} OR
+            LOWER(ui.lname) LIKE $${paramIndex} OR
+            LOWER(CONCAT(ui.fname, ' ', ui.lname)) LIKE $${paramIndex} OR
+            LOWER(u.email) LIKE $${paramIndex} OR
+            CAST(ui.student_id AS TEXT) LIKE $${paramIndex}
+        )`);
+        values.push(`%${search.toLowerCase().trim()}%`);
+        paramIndex++;
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+
+    const dataQuery = `
+        SELECT * FROM users_info ui
+        JOIN users u ON u.uid = ui.uid
+        ${whereClause}
+        ORDER BY ui.uid
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    values.push(limit, offset)
+
+    const countQuery = `
+        SELECT COUNT(*) FROM users_info ui
+        JOIN users u ON u.uid = ui.uid
+        ${whereClause}
+    `
+
+    const [dataResult, countResult] = await Promise.all([
+        pool.query(dataQuery, values),
+        pool.query(countQuery, values.slice(0, -2)) // remove limit & offset
+    ])
+
+    const total = parseInt(countResult.rows[0].count, 10)
+
+    return {
+        data: dataResult.rows,
+        pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1
+        }
+    }
 }
 
 export async function registerUser(fname,mname,lname,course,role,phone,email,password,status){     
