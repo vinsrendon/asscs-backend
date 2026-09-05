@@ -9,20 +9,6 @@ dotenv.config()
 
 const  { getUsers, registerUser, loginUser, getUserById, editUser} = require('../database.js')
 
-// router.get('/users',verifyToken, async (req,res) => {
-//     const token = req.cookies.token
-//     try {
-//         const users = await getUsers()
-//         if (users.length === 0) {
-//             return res.status(200).json("NO USERS FOUND")
-//         } else {
-//             return res.status(200).json(users)
-//         }        
-//     } 
-//     catch (err) {      
-//         return res.status(500).json({ message: "Unexpected Error occurred",error:err })
-//     }    
-// })
 router.get('/users', verifyToken, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1
@@ -69,7 +55,6 @@ router.post("/register", async (req,res) => {
     }
 })
 
-
 router.post("/login" , async (req,res) => {
     const {email,password} = req.body    
     
@@ -99,7 +84,7 @@ router.post("/login" , async (req,res) => {
                     secure: true,
                     sameSite: isDev ? "none" : "strict",
                     maxAge: 60 * 60 * 1000, //1 HOUR
-                    partitioned: !isDev,
+                    partitioned: true,
                 })
                 const currentTime = new Date().toLocaleString()
                 console.log(email+" LOGGED IN || TIME: "+currentTime)

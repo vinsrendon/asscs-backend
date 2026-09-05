@@ -88,11 +88,16 @@ export async function registerUser(fname,mname,lname,course,role,phone,email,pas
     const conn = await pool.connect()
 
     let sid = null    
+    let aid = null    
     
     try {
         if (role === 'STUDENT') {
             sid = await generateStudentId()
-            // console.log(sid)            
+        }
+
+        if (role === 'APPLICANT') {
+            aid = await generateApplicantId()
+            aid = Number(`8${aid}`)
         }
 
         await conn.query('BEGIN')
@@ -105,9 +110,9 @@ export async function registerUser(fname,mname,lname,course,role,phone,email,pas
         const newUserId = userResult.rows[0].uid
 
         await conn.query(`
-            INSERT INTO users_info(uid, fname, mname, lname, course, phone,student_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)`, 
-            [newUserId, fname,mname,lname,course,phone, sid])
+            INSERT INTO users_info(uid, fname, mname, lname, course, phone,student_id,applicant_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, 
+            [newUserId, fname,mname,lname,course,phone,sid,aid])
 
         await conn.query('COMMIT')
     } catch (err) {
@@ -141,6 +146,34 @@ async function generateStudentId(){
     if (result.rows.length > 0) {
         const lastStudentId = result.rows[0].student_id
         sequence = (lastStudentId % 10000) + 1
+    }
+
+    return year * 10000 + sequence
+}
+
+async function generateApplicantId(){    
+    const year = new Date().getFullYear()
+    let result
+    try {
+        result = await pool.query(
+        `
+        SELECT applicant_id
+        FROM users_info
+        WHERE applicant_id >= $1 and applicant_id < $2
+        ORDER BY applicant_id DESC
+        LIMIT 1
+        `,
+        [year * 10000, (year + 1) * 10000]
+    )
+    } catch (error) {
+        console.log(error)        
+    }
+
+    let sequence = 1
+
+    if (result.rows.length > 0) {
+        const lastApplicantId = result.rows[0].applicant_id
+        sequence = (lastApplicantId % 10000) + 1
     }
 
     return year * 10000 + sequence
