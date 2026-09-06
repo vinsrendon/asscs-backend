@@ -26,15 +26,30 @@ export async function getUsers({page = 1,limit = 10,search = '',filter = 'all'} 
     let where = []
     let paramIndex = 1
 
+    if(filter === 'all'){
+        // where.push(`UPPER(u.status::text) IN ('ACTIVE', 'PENDING')`)
+        where.push(`UPPER(u.status::text) = 'ACTIVE'`)
+    }
     if (filter === 'teachers') {
         where.push(`UPPER(u.role::text) = $${paramIndex++}`)
         values.push('TEACHER')
-    } else if (filter === 'students') {
+        where.push(`UPPER(u.status::text) = 'ACTIVE'`)
+    } 
+    else if (filter === 'students') {
         where.push(`UPPER(u.role::text) = $${paramIndex++}`)
         values.push('STUDENT')
-    } else if (filter === 'pendings') {
-        where.push(`UPPER(u.status::text) = $${paramIndex++}`)
-        values.push('PENDING')
+        where.push(`UPPER(u.status::text) = 'ACTIVE'`)
+    } 
+    else if (filter === 'applicants') {
+        where.push(`UPPER(u.role::text) = $${paramIndex++}`)
+        values.push('APPLICANT')
+        where.push(`UPPER(u.status::text) = 'ACTIVE'`)
+    }
+    else if (filter === 'pendings') {
+        where.push(`UPPER(u.status::text) = 'PENDING'`)
+    }
+    else if (filter === 'inactive') {
+        where.push(`UPPER(u.status::text) = 'INACTIVE'`)
     }
 
     if (search.trim()) {
@@ -194,6 +209,17 @@ export async function loginUser(user){
 export async function getUserById(uid){    
     const result = await pool.query(`SELECT * FROM users_info ui JOIN users u ON u.uid=ui.uid WHERE u.uid = $1`,[uid])    
     return result.rows
+}
+
+export async function getTotalUsers(){
+    const count = await pool.query(`SELECT
+    COUNT(*) FILTER (WHERE role = 'STUDENT') AS student_count,
+    COUNT(*) FILTER (WHERE role = 'TEACHER') AS teacher_count,
+    COUNT(*) FILTER (WHERE role = 'APPLICANT') AS applicant_count,
+    COUNT(*) AS total_count
+    FROM users`)
+
+    return count.rows
 }
 
 export async function editUser(query,values){

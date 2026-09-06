@@ -7,7 +7,8 @@ const {verifyToken} = require('./verify.js')
 
 dotenv.config()
 
-const  { getUsers, registerUser, loginUser, getUserById, editUser} = require('../database.js')
+const  { getUsers, registerUser, loginUser, getUserById, editUser, getTotalUsers} = require('../database.js')
+const { get } = require("./chatbot.js")
 
 router.get('/users', verifyToken, async (req, res) => {
     try {
@@ -110,6 +111,16 @@ router.get('/userbyid',verifyToken, async (req,res) => {
     try {        
         const user = await getUserById(uid)
         return res.status(200).json(user)
+    } 
+    catch (err) {   
+        return res.status(500).json({ message: "Unexpected Error occurred",error:err })
+    }    
+})
+
+router.get('/usercount',verifyToken, async (req,res) => {
+    try {        
+        const count = await getTotalUsers()
+        return res.status(200).json(count)
     } 
     catch (err) {   
         return res.status(500).json({ message: "Unexpected Error occurred",error:err })
