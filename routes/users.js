@@ -8,7 +8,6 @@ const {verifyToken} = require('./verify.js')
 dotenv.config()
 
 const  { getUsers, registerUser, loginUser, getUserById, editUser, getTotalUsers} = require('../database.js')
-const { get } = require("./chatbot.js")
 
 router.get('/users', verifyToken, async (req, res) => {
     try {

@@ -27,7 +27,6 @@ export async function getUsers({page = 1,limit = 10,search = '',filter = 'all'} 
     let paramIndex = 1
 
     if(filter === 'all'){
-        // where.push(`UPPER(u.status::text) IN ('ACTIVE', 'PENDING')`)
         where.push(`UPPER(u.status::text) = 'ACTIVE'`)
     }
     if (filter === 'teachers') {
