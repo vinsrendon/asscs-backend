@@ -97,7 +97,6 @@ export async function registerUser(fname,mname,lname,course,role,phone,email,pas
 
         if (role === 'APPLICANT') {
             aid = await generateApplicantId()
-            aid = Number(`8${aid}`)
         }
 
         await conn.query('BEGIN')
@@ -151,32 +150,40 @@ async function generateStudentId(){
     return year * 10000 + sequence
 }
 
-async function generateApplicantId(){    
+async function generateApplicantId() {
     const year = new Date().getFullYear()
+
+    const prefix = Number(`8${year}`)       // 82026
+    const startId = prefix * 10000 + 1      // 820260001
+    const endId = prefix * 10000 + 9999     // 820269999
+
     let result
+
     try {
         result = await pool.query(
-        `
-        SELECT applicant_id
-        FROM users_info
-        WHERE applicant_id >= $1 and applicant_id < $2
-        ORDER BY applicant_id DESC
-        LIMIT 1
-        `,
-        [year * 10000, (year + 1) * 10000]
-    )
+            `
+            SELECT applicant_id
+            FROM users_info
+            WHERE applicant_id >= $1
+              AND applicant_id <= $2
+            ORDER BY applicant_id DESC
+            LIMIT 1
+            `,
+            [startId, endId]
+        )
     } catch (error) {
-        console.log(error)        
+        console.log(error)
+        throw error
     }
 
     let sequence = 1
 
     if (result.rows.length > 0) {
-        const lastApplicantId = result.rows[0].applicant_id
+        const lastApplicantId = Number(result.rows[0].applicant_id)
         sequence = (lastApplicantId % 10000) + 1
     }
 
-    return year * 10000 + sequence
+    return prefix * 10000 + sequence
 }
 
 export async function loginUser(user){    
