@@ -58,9 +58,9 @@ export async function getUsers({page = 1,limit = 10,search = '',filter = 'all'} 
             LOWER(CONCAT(ui.fname, ' ', ui.lname)) LIKE $${paramIndex} OR
             LOWER(u.email) LIKE $${paramIndex} OR
             CAST(ui.student_id AS TEXT) LIKE $${paramIndex}
-        )`);
-        values.push(`%${search.toLowerCase().trim()}%`);
-        paramIndex++;
+        )`)
+        values.push(`%${search.toLowerCase().trim()}%`)
+        paramIndex++
     }
 
     const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
@@ -234,6 +234,94 @@ export async function getChatConversationById(uid){
 export async function getMessageById(id){    
     const result = await pool.query(`SELECT * FROM messages m WHERE m.conversation_id = $1 ORDER BY created_at ASC`,[id])    
     return result.rows
+}
+
+export async function createExam(subject, title, type, userId){
+    const code = await generateExamCode(subject, title, type)
+
+    const result = await pool.query(
+      `INSERT INTO exam(code, subject, title, type, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [code, subject, title, type, userId]
+    )
+
+    return result
+}
+
+/*
+    Generate exam code
+    - Subject exam   → MATH-[YEAR]-0001
+    - Entrance exam  → ENTRANCE-[YEAR]-0001
+ */
+async function generateExamCode(subject, title = "", type = "SUBJECT") {
+  const year = new Date().getFullYear()
+
+  let prefix
+
+  // ===== ENTRANCE EXAM =====
+  if (type === "ENTRANCE") {
+    prefix = `ENTRANCE-${year}`
+  } 
+  // ===== SUBJECT EXAM =====
+  else {
+    // Create abbreviation from subject/title
+    let base = (subject || title || "EXAM")
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, "")
+      .trim()
+      .split(/\s+/)
+      .map(word => word.slice(0, 3))
+      .join("")
+      .slice(0, 8)
+
+    // Common overrides
+    const commonMap = {
+      'MATHEMATICS': "MATH",
+      'MATH': "MATH",
+      'ENGLISH': "ENG",
+      'PHYSICS': "PHY",
+      'CHEMISTRY': "CHEM",
+      'BIOLOGY': "BIO",
+      'SCIENCE': "SCI",
+      'COMPUTER PROGRAMMING':"COMPROG",
+      'APPLICATIONS DEVELOPEMENT':"APPSDEV",
+    }
+
+    const fullText = `${subject} ${title}`.toUpperCase()
+    for (const [key, abbr] of Object.entries(commonMap)) {
+      if (fullText.includes(key)) {
+        base = abbr
+        break
+      }
+    }
+
+    prefix = `${base}-${year}`
+  }
+
+  // ----- Get next sequential number -----
+  const result = await pool.query(
+    `
+    SELECT code 
+    FROM exam
+    WHERE code LIKE $1
+    ORDER BY code DESC
+    LIMIT 1
+    `,
+    [`${prefix}-%`]
+  )
+
+  let nextNumber = 1
+
+  if (result.rows.length > 0) {
+    const lastCode = result.rows[0].code
+    const lastNumber = parseInt(lastCode.split("-").pop(), 10)
+    nextNumber = lastNumber + 1
+  }
+
+  const numberPart = String(nextNumber).padStart(4, "0")
+
+  return `${prefix}-${numberPart}`
 }
 
 export default pool

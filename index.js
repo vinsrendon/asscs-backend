@@ -15,7 +15,7 @@ app.use(cookieParser())
 
 app.use(
   cors({
-    origin: function (origin, callback) {      
+    origin: function (origin, callback) {         
       if (mode === 'DEV' && (!origin || origin.match(/^https?:\/\/.*:5173$/) || origin.match(/^https?:\/\/.*:4173$/))) {
         callback(null, true)
       }
@@ -41,9 +41,11 @@ app.get("/", (req, res)=>{
 
 const userRouter = require("./routes/users.js")
 const chatbotRouter = require("./routes/chatbot.js")
+const examRouter = require("./routes/exam.js")
 
 app.use(userRouter)
 app.use(chatbotRouter)
+app.use(examRouter)
 
 const httpsOptions = {
   key: fs.readFileSync('./cert/192.168.254.108+2-key.pem'),
