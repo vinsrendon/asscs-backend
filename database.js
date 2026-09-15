@@ -257,16 +257,16 @@ export async function createExam(subject, title, type, userId){
 async function generateExamCode(subject, title = "", type = "SUBJECT") {
   const year = new Date().getFullYear()
 
-  let prefix
+  let base
 
   // ===== ENTRANCE EXAM =====
   if (type === "ENTRANCE") {
-    prefix = `ENTRANCE-${year}`
+    base = "ENTRANCE"
   } 
   // ===== SUBJECT EXAM =====
   else {
     // Create abbreviation from subject/title
-    let base = (subject || title || "EXAM")
+    base = (subject || title || "EXAM")
       .toUpperCase()
       .replace(/[^A-Z0-9\s]/g, "")
       .trim()
@@ -284,8 +284,8 @@ async function generateExamCode(subject, title = "", type = "SUBJECT") {
       'CHEMISTRY': "CHEM",
       'BIOLOGY': "BIO",
       'SCIENCE': "SCI",
-      'COMPUTER PROGRAMMING':"COMPROG",
-      'APPLICATIONS DEVELOPEMENT':"APPSDEV",
+      'COMPUTER PROGRAMMING': "COMPROG",
+      'APPLICATIONS DEVELOPEMENT': "APPSDEV",
     }
 
     const fullText = `${subject} ${title}`.toUpperCase()
@@ -295,9 +295,9 @@ async function generateExamCode(subject, title = "", type = "SUBJECT") {
         break
       }
     }
-
-    prefix = `${base}-${year}`
   }
+
+  const prefix = `${base}${year}`   // e.g. MATH2025
 
   // ----- Get next sequential number -----
   const result = await pool.query(
@@ -308,20 +308,21 @@ async function generateExamCode(subject, title = "", type = "SUBJECT") {
     ORDER BY code DESC
     LIMIT 1
     `,
-    [`${prefix}-%`]
+    [`${prefix}%`]                 // matches MATH20250001, MATH20250002, ...
   )
 
   let nextNumber = 1
 
   if (result.rows.length > 0) {
     const lastCode = result.rows[0].code
-    const lastNumber = parseInt(lastCode.split("-").pop(), 10)
+    // Extract the last 4 digits
+    const lastNumber = parseInt(lastCode.slice(-4), 10)
     nextNumber = lastNumber + 1
   }
 
   const numberPart = String(nextNumber).padStart(4, "0")
 
-  return `${prefix}-${numberPart}`
+  return `${prefix}${numberPart}`   // MATH20250001
 }
 
 export default pool
