@@ -236,14 +236,14 @@ export async function getMessageById(id){
     return result.rows
 }
 
-export async function createExam(subject, title, type, userId){
+export async function createExam(subject, title, type, userId, numberOfItems){
     const code = await generateExamCode(subject, title, type)
 
     const result = await pool.query(
-      `INSERT INTO exam(code, subject, title, type, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO exam(code, subject, title, type, created_by, total_items)
+       VALUES ($1, $2, $3, $4, $5,$6)
        RETURNING *`,
-      [code, subject, title, type, userId]
+      [code, subject, title, type, userId, numberOfItems]
     )
 
     return result
@@ -323,6 +323,59 @@ async function generateExamCode(subject, title = "", type = "SUBJECT") {
   const numberPart = String(nextNumber).padStart(4, "0")
 
   return `${prefix}${numberPart}`   // MATH20250001
+}
+
+export async function getExams({page = 1,limit = 10,search = '',filter = 'all'} = {}){
+    const offset = (page - 1) * limit
+    const values = []
+    let where = []
+    let paramIndex = 1
+
+    if (search.trim()) {
+        where.push(`(
+            LOWER(ui.fname) LIKE $${paramIndex} OR
+            LOWER(ui.lname) LIKE $${paramIndex} OR
+            LOWER(CONCAT(ui.fname, ' ', ui.lname)) LIKE $${paramIndex} OR
+            LOWER(u.email) LIKE $${paramIndex} OR
+            CAST(ui.student_id AS TEXT) LIKE $${paramIndex}
+        )`)
+        values.push(`%${search.toLowerCase().trim()}%`)
+        paramIndex++
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+
+    const dataQuery = `
+        SELECT * FROM exam e
+        JOIN exam_answer_keys ek ON e.id = ek.id
+        ${whereClause}
+        ORDER BY e.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    values.push(limit, offset)
+
+    const countQuery = `
+        SELECT COUNT(*) FROM exam_answer_keys ek
+        JOIN exam e ON e.id = ek.id
+        ${whereClause}
+    `
+
+    const [dataResult, countResult] = await Promise.all([
+        pool.query(dataQuery, values),
+        pool.query(countQuery, values.slice(0, -2)) // remove limit & offset
+    ])
+
+    const total = parseInt(countResult.rows[0].count, 10)
+
+    return {
+        data: dataResult.rows,
+        pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1
+        }
+    }
 }
 
 export default pool
