@@ -6,7 +6,7 @@ const dotenv = require('dotenv')
 const {verifyToken} = require('./verify.js')
 
 
-const  { createExam, getExams} = require('../database.js')
+const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults} = require('../database.js')
 
 router.get('/exams', verifyToken, async (req, res) => {
     try {
@@ -35,7 +35,6 @@ const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
 
     try {
         const { subject, title, type, numberOfItems} = req.body
-        console.log(req.body);
         
         const userId = decoded.id    
 
@@ -43,7 +42,7 @@ const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
         return res.status(400).json({ error: "Subject is required" })
         }
 
-        const result = await createExam(subject, title, type, numberOfItems, userId)
+        const result = await createExam(subject, title, type, userId, numberOfItems)
 
         res.status(200).json({
         message: "Exam created successfully",
@@ -54,5 +53,112 @@ const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
         res.status(500).json({ error: "Failed to create exam" })
     }
 })
+
+router.delete('/exam/:id', verifyToken, async (req, res) => {
+  try {
+    const examId = parseInt(req.params.id)
+
+    if (!examId || isNaN(examId)) {
+      return res.status(400).json({ message: 'Invalid exam ID' })
+    }
+
+    const result = await deleteExam(examId)
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Exam not found' })
+    }
+
+    return res.status(200).json({
+      message: 'Exam deleted successfully',
+      exam: result.rows[0]
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({
+      message: 'Failed to delete exam',
+      error: err.message
+    })
+  }
+})
+
+router.post('/exam/:id/answer-key', verifyToken, async (req, res) => {
+  try {
+    const examId = parseInt(req.params.id)
+    const { answers } = req.body
+
+    if (!examId || isNaN(examId)) {
+      return res.status(400).json({ message: 'Invalid exam ID' })
+    }
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({ message: 'Answers must be a non-empty array' })
+    }
+
+    const result = await uploadAnswerKey(examId, answers)
+
+    return res.status(200).json({
+      message: 'Answer key saved successfully',
+      answerKey: result
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({
+      message: 'Failed to save answer key',
+      error: err.message
+    })
+  }
+})
+
+router.post('/exam/check', verifyToken, async (req, res) => {
+  try {
+    const { examCode, studentId, studentAnswers } = req.body
+
+    if (!examCode || !studentId || !Array.isArray(studentAnswers) || studentAnswers.length === 0) {
+      return res.status(400).json({ 
+        message: 'examCode, studentId and studentAnswers are required' 
+      })
+    }
+
+    const result = await gradeAndSaveResult(examCode, studentId, studentAnswers)
+
+    return res.status(200).json({
+      message: 'Exam graded and saved successfully',
+      result
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(400).json({
+      message: err.message || 'Failed to grade exam'
+    })
+  }
+})
+
+router.get('/student/:studentId/results', verifyToken, async (req, res) => {
+    try {
+        const studentId = req.params.studentId
+
+        if (!studentId) {
+            return res.status(400).json({
+                message: 'Student ID is required'
+            })
+        }
+
+        const results = await getStudentResults(studentId)
+
+        return res.status(200).json({
+            data: results
+        })
+
+    } catch (err) {
+        console.error(err)
+
+        return res.status(500).json({
+            message: 'Failed to get student results',
+            error: err.message
+        })
+    }
+})
+
+
 
 module.exports = router

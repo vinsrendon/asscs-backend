@@ -325,57 +325,345 @@ async function generateExamCode(subject, title = "", type = "SUBJECT") {
   return `${prefix}${numberPart}`   // MATH20250001
 }
 
-export async function getExams({page = 1,limit = 10,search = '',filter = 'all'} = {}){
-    const offset = (page - 1) * limit
-    const values = []
-    let where = []
-    let paramIndex = 1
+export async function getExams({
+  page = 1,
+  limit = 10,
+  search = '',
+  filter = 'all'
+} = {}) {
+  // Ensure numbers
+  page  = Math.max(1, parseInt(page, 10) || 1);
+  limit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
 
-    if (search.trim()) {
-        where.push(`(
-            LOWER(ui.fname) LIKE $${paramIndex} OR
-            LOWER(ui.lname) LIKE $${paramIndex} OR
-            LOWER(CONCAT(ui.fname, ' ', ui.lname)) LIKE $${paramIndex} OR
-            LOWER(u.email) LIKE $${paramIndex} OR
-            CAST(ui.student_id AS TEXT) LIKE $${paramIndex}
-        )`)
-        values.push(`%${search.toLowerCase().trim()}%`)
-        paramIndex++
+  const offset = (page - 1) * limit;
+  const values = [];
+  const where  = [];
+  let paramIndex = 1;
+
+  // Search on title or subject
+  if (search.trim()) {
+    where.push(`(
+      LOWER(e.title)   LIKE $${paramIndex} OR
+      LOWER(e.subject) LIKE $${paramIndex}
+    )`);
+    values.push(`%${search.toLowerCase().trim()}%`);
+    paramIndex++;
+  }
+
+  // Optional: add filter logic here later if needed
+  // if (filter === 'with_key') { ... }
+
+  const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+  const dataQuery = `
+    SELECT
+      e.id,
+      e.code,
+      e.subject,
+      e.title,
+      e.type,
+      e.created_by,
+      e.created_at,
+      e.total_items,
+      ek.answers,
+      CASE
+        WHEN ek.id IS NULL THEN 'no answer key'
+        ELSE 'has answer key'
+      END AS status
+    FROM exam e
+    LEFT JOIN exam_answer_keys ek ON e.id = ek.exam_id
+    ${whereClause}
+    ORDER BY e.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  values.push(limit, offset);
+
+  const countQuery = `
+    SELECT COUNT(*)::int AS count
+    FROM exam e
+    LEFT JOIN exam_answer_keys ek ON e.id = ek.exam_id
+    ${whereClause}
+  `;
+
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(dataQuery, values),
+    pool.query(countQuery, values.slice(0, -2)) // remove limit & offset
+  ]);
+
+  const total = countResult.rows[0].count;
+
+  return {
+    data: dataResult.rows,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 1
+    }
+  };
+}
+
+export async function deleteExam(examId) {
+  const conn = await pool.connect()
+
+  try {
+    await conn.query('BEGIN')
+
+    // Delete answer key first (if exists)
+    await conn.query(
+      `DELETE FROM exam_answer_keys WHERE exam_id = $1`,
+      [examId]
+    )
+
+    // Delete the exam
+    const result = await conn.query(
+      `DELETE FROM exam WHERE id = $1 RETURNING *`,
+      [examId]
+    )
+
+    await conn.query('COMMIT')
+
+    return result
+  } catch (err) {
+    await conn.query('ROLLBACK')
+    throw err
+  } finally {
+    conn.release()
+  }
+}
+
+export async function uploadAnswerKey(examId, answers) {
+  const result = await pool.query(
+    `
+    INSERT INTO exam_answer_keys (exam_id, answers)
+    VALUES ($1, $2)
+    ON CONFLICT (exam_id) 
+    DO UPDATE SET answers = EXCLUDED.answers
+    RETURNING *
+    `,
+    [examId, JSON.stringify(answers)]
+  )
+
+  return result.rows[0]
+}
+
+export async function gradeAndSaveResult(examCode, studentId, studentAnswers) {
+  const conn = await pool.connect()
+
+  try {
+    await conn.query('BEGIN')
+
+    // Clean values
+    const cleanExamCode = String(examCode).trim().toUpperCase()
+    const cleanStudentId = String(studentId).trim()
+
+    // 1. Find the exam + answer key
+    const examResult = await conn.query(
+      `
+      SELECT 
+        e.id,
+        e.code,
+        e.title,
+        e.type,
+        e.total_items,
+        ek.answers
+      FROM exam e
+      LEFT JOIN exam_answer_keys ek 
+        ON e.id = ek.exam_id
+      WHERE UPPER(e.code) = $1
+      `,
+      [cleanExamCode]
+    )
+
+    if (examResult.rows.length === 0) {
+      throw new Error(`Exam not found with code: ${examCode}`)
     }
 
-    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+    const exam = examResult.rows[0]
 
-    const dataQuery = `
-        SELECT * FROM exam e
-        JOIN exam_answer_keys ek ON e.id = ek.id
-        ${whereClause}
-        ORDER BY e.created_at DESC
-        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `
-    values.push(limit, offset)
+    if (!exam.answers) {
+      throw new Error('This exam has no answer key yet')
+    }
 
-    const countQuery = `
-        SELECT COUNT(*) FROM exam_answer_keys ek
-        JOIN exam e ON e.id = ek.id
-        ${whereClause}
-    `
+    // 2. Validate exam type and ID type
 
-    const [dataResult, countResult] = await Promise.all([
-        pool.query(dataQuery, values),
-        pool.query(countQuery, values.slice(0, -2)) // remove limit & offset
-    ])
+    const examType = String(exam.type).trim().toUpperCase()
 
-    const total = parseInt(countResult.rows[0].count, 10)
+    // Student ID:
+    // 20260001
+    // 20260002
+    //
+    // Applicant ID:
+    // 820260001
+    // 820260002
+
+    const isStudentId = /^\d{8}$/.test(cleanStudentId)
+    const isApplicantId = /^8\d{8}$/.test(cleanStudentId)
+
+    if (examType === 'SUBJECT') {
+
+      if (!isStudentId) {
+        throw new Error(
+          'This is a SUBJECT exam. Only students with a valid Student ID can take this exam.'
+        )
+      }
+
+    } else if (examType === 'ENTRANCE') {
+
+      if (!isApplicantId) {
+        throw new Error(
+          'This is an ENTRANCE exam. Only applicants with a valid Applicant ID can take this exam.'
+        )
+      }
+
+    } else {
+      throw new Error(`Invalid exam type: ${exam.type}`)
+    }
+
+    // 3. Handle answer key
+    let officialAnswers = exam.answers
+
+    if (typeof officialAnswers === 'string') {
+      officialAnswers = JSON.parse(officialAnswers)
+    }
+
+    // 4. Grade the answers
+    let correct = 0
+    const details = []
+
+    studentAnswers.forEach((item) => {
+      const qIndex = item.question - 1
+
+      const official = officialAnswers[qIndex] || null
+
+      const studentAns = (item.answer || '?')
+        .toUpperCase()
+        .trim()
+
+      const isCorrect =
+        official &&
+        studentAns === String(official).toUpperCase().trim()
+
+      if (isCorrect) {
+        correct++
+      }
+
+      details.push({
+        question: item.question,
+        studentAnswer: studentAns,
+        correctAnswer: official || 'N/A',
+        isCorrect
+      })
+    })
+
+    // 5. Calculate score
+    const total = officialAnswers.length
+
+    const score =
+      total > 0
+        ? Math.round((correct / total) * 100)
+        : 0
+
+    // 6. Save / update result
+    const saveResult = await conn.query(
+      `
+      INSERT INTO results (
+        student_id,
+        exam_id,
+        answers,
+        score
+      )
+      VALUES ($1, $2, $3, $4)
+
+      ON CONFLICT (student_id, exam_id)
+      DO UPDATE SET
+        answers = EXCLUDED.answers,
+        score = EXCLUDED.score
+
+      RETURNING *
+      `,
+      [
+        cleanStudentId,
+        exam.id,
+        JSON.stringify(studentAnswers),
+        score
+      ]
+    )
+
+    await conn.query('COMMIT')
 
     return {
-        data: dataResult.rows,
-        pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit) || 1
-        }
+      exam: {
+        id: exam.id,
+        code: exam.code,
+        title: exam.title,
+        type: exam.type,
+        totalItems: total
+      },
+
+      studentId: cleanStudentId,
+      correct,
+      total,
+      score,
+      details,
+      resultId: saveResult.rows[0].id
     }
+
+  } catch (err) {
+
+    await conn.query('ROLLBACK')
+    throw err
+
+  } finally {
+
+    conn.release()
+
+  }
+}
+
+export async function getStudentResults(id) {
+  const cleanId = String(id).trim()
+
+  const result = await pool.query(
+    `
+    SELECT
+        r.id AS result_id,
+        r.student_id,
+        r.exam_id,
+        r.score,
+        r.answers,
+
+        e.code AS exam_code,
+        e.title AS exam_title,
+        e.subject,
+        e.type,
+        e.total_items,
+        e.created_at AS exam_date
+
+    FROM results r
+
+    JOIN exam e
+        ON e.id = r.exam_id
+
+    JOIN users_info ui
+        ON (
+            ui.student_id::text = r.student_id::text
+            OR
+            ui.applicant_id::text = r.student_id::text
+        )
+
+    WHERE
+        ui.student_id::text = $1
+        OR
+        ui.applicant_id::text = $1
+
+    ORDER BY e.created_at DESC
+    `,
+    [cleanId]
+  )
+
+  return result.rows
 }
 
 export default pool
