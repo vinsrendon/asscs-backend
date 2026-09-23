@@ -666,4 +666,145 @@ export async function getStudentResults(id) {
   return result.rows
 }
 
+export async function getStudentExamStats(uid) {
+    const result = await pool.query(
+        `
+        SELECT
+            CASE
+                WHEN ui.student_id IS NOT NULL
+                    THEN ui.student_id::text
+                WHEN ui.applicant_id IS NOT NULL
+                    THEN ui.applicant_id::text
+            END AS identifier
+        FROM users_info ui
+        WHERE ui.uid = $1
+        `,
+        [uid]
+    )
+
+    if (result.rows.length === 0) {
+        throw new Error('User information not found')
+    }
+
+    const identifier = result.rows[0].identifier
+
+    if (!identifier) {
+        return {
+            exam_count: 0,
+            average_score: 0
+        }
+    }
+
+    const stats = await pool.query(
+        `
+        SELECT
+            COUNT(*)::int AS exam_count,
+            COALESCE(ROUND(AVG(score), 2), 0) AS average_score
+        FROM results
+        WHERE student_id::text = $1
+        `,
+        [identifier]
+    )
+
+    return stats.rows[0]
+}
+
+export async function getStudentSubjectStrengths(uid) {
+    const result = await pool.query(
+        `
+        SELECT
+            subject,
+            ROUND(AVG(score), 2) AS average_score
+        FROM (
+            SELECT
+                e.subject,
+                r.score,
+                e.created_at
+            FROM results r
+            JOIN exam e
+                ON e.id = r.exam_id
+            JOIN users_info ui
+                ON (
+                    ui.student_id::text = r.student_id::text
+                    OR
+                    ui.applicant_id::text = r.student_id::text
+                )
+            WHERE ui.uid = $1
+            ORDER BY e.created_at DESC
+            LIMIT 3
+        ) latest
+        GROUP BY subject
+        ORDER BY average_score DESC
+        `,
+        [uid]
+    )
+
+    return result.rows
+}
+
+export async function getStudentGradeTrend(uid) {
+    const result = await pool.query(
+        `
+        SELECT
+            e.id AS exam_id,
+            e.subject,
+            e.title AS exam_title,
+            r.score,
+            e.created_at AS exam_date
+        FROM results r
+        JOIN exam e
+            ON e.id = r.exam_id
+        JOIN users_info ui
+            ON (
+                ui.student_id::text = r.student_id::text
+                OR
+                ui.applicant_id::text = r.student_id::text
+            )
+        WHERE ui.uid = $1
+        ORDER BY e.created_at DESC
+        `,
+        [uid]
+    )
+
+    return result.rows
+}
+
+export async function getStudentTakenExamResults(uid) {
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+          r.id AS result_id,
+          r.student_id,
+          r.exam_id,
+          r.score,
+          r.answers AS student_answers,
+          e.code AS exam_code,
+          e.title AS exam_title,
+          e.subject,
+          e.type,
+          e.total_items,
+          e.created_at AS exam_date,
+          ak.answers AS answer_key
+      FROM users_info ui
+      JOIN results r 
+          ON ui.student_id::text = r.student_id::text 
+          OR ui.applicant_id::text = r.student_id::text
+      JOIN exam e 
+          ON e.id = r.exam_id
+      LEFT JOIN exam_answer_keys ak 
+          ON e.id = ak.exam_id
+      WHERE ui.uid = $1
+      ORDER BY e.created_at DESC
+      `,
+      [uid]
+    )
+
+    return result.rows
+  } catch (err) {
+    console.error("Error executing getStudentTakenExamResults:", err)
+    throw err
+  }
+}
+
 export default pool

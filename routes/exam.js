@@ -6,7 +6,7 @@ const dotenv = require('dotenv')
 const {verifyToken} = require('./verify.js')
 
 
-const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults} = require('../database.js')
+const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults, getStudentExamStats, getStudentSubjectStrengths, getStudentGradeTrend, getStudentTakenExamResults} = require('../database.js')
 
 router.get('/exams', verifyToken, async (req, res) => {
     try {
@@ -34,8 +34,16 @@ const token = req.cookies.token
 const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
 
     try {
-        const { subject, title, type, numberOfItems} = req.body
+        let { subject, title, type, numberOfItems} = req.body
         
+        if (subject != null) {
+          subject = subject.toUpperCase();
+        }
+
+        if (title != null) {
+          title = title.toUpperCase();
+        }
+
         const userId = decoded.id    
 
         if (!subject) {
@@ -152,11 +160,86 @@ router.get('/student/:studentId/results', verifyToken, async (req, res) => {
     } catch (err) {
         console.error(err)
 
-        return res.status(500).json({
+        return res.status(400).json({
             message: 'Failed to get student results',
             error: err.message
         })
     }
+})
+
+router.get('/student/stats', verifyToken, async (req, res) => {  
+  try {
+    const token = req.cookies.token
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+    const uid = decoded.id
+
+    const stats = await getStudentExamStats(uid)
+
+    return res.status(200).json({stats})
+  } catch (err) {
+    console.error(err)
+
+    return res.status(400).json({
+        message: 'Failed to get statistics',
+        error: err.message
+    })
+  }
+})
+
+router.get('/student/subjectstrengths', verifyToken, async (req, res) => {  
+  try {
+    const token = req.cookies.token
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+    const uid = decoded.id
+
+    const stats = await getStudentSubjectStrengths(uid)
+
+    return res.status(200).json({stats})
+  } catch (err) {
+    console.error(err)
+
+    return res.status(400).json({
+        message: 'Failed to get statistics',
+        error: err.message
+    })
+  }
+})
+
+router.get('/student/gradetrends', verifyToken, async (req, res) => {  
+  try {
+    const token = req.cookies.token
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+    const uid = decoded.id
+
+    const trends = await getStudentGradeTrend(uid)
+
+    return res.status(200).json({trends})
+  } catch (err) {
+    console.error(err)
+
+    return res.status(400).json({
+        message: 'Failed to get statistics',
+        error: err.message
+    })
+  }
+})
+
+router.get('/student/taken-exams', verifyToken, async (req, res) => {
+  try {
+    const token = req.cookies.token
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+    const uid = decoded.id
+
+    const results = await getStudentTakenExamResults(uid)
+
+    return res.status(200).json({results})
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({
+      message: 'Failed to retrieve taken exam results',
+      error: err.message
+    })
+  }
 })
 
 
