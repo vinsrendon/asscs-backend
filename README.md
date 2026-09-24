@@ -16,7 +16,7 @@ GEMINI_API_KEY=
 GEMINI_MODEL=
 
 To generate access token
-`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+`node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
 
 1. Install mkcert
 winget install FiloSottile.mkcert

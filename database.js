@@ -411,10 +411,10 @@ export async function deleteExam(examId) {
     await conn.query('BEGIN')
 
     // Delete answer key first (if exists)
-    await conn.query(
-      `DELETE FROM exam_answer_keys WHERE exam_id = $1`,
-      [examId]
-    )
+    // await conn.query(
+    //   `DELETE FROM exam_answer_keys WHERE exam_id = $1`,
+    //   [examId]
+    // )
 
     // Delete the exam
     const result = await conn.query(
