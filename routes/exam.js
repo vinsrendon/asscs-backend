@@ -119,7 +119,9 @@ router.post('/exam/:id/answer-key', verifyToken, async (req, res) => {
 
 router.post('/exam/check', verifyToken, async (req, res) => {
   try {
-    const { examCode, studentId, studentAnswers } = req.body
+    let { examCode, studentId, studentAnswers } = req.body
+
+    examCode = examCode.toUpperCase()
 
     if (!examCode || !studentId || !Array.isArray(studentAnswers) || studentAnswers.length === 0) {
       return res.status(400).json({ 
