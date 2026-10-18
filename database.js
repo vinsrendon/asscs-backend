@@ -236,14 +236,14 @@ export async function getMessageById(id){
     return result.rows
 }
 
-export async function createExam(subject, title, type, userId, numberOfItems){
+export async function createExam(subject, title, type, userId, numberOfItems, status){
     const code = await generateExamCode(subject, title, type)
 
     const result = await pool.query(
-      `INSERT INTO exam(code, subject, title, type, created_by, total_items)
-       VALUES ($1, $2, $3, $4, $5,$6)
+      `INSERT INTO exam(code, subject, title, type, created_by, total_items, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [code, subject, title, type, userId, numberOfItems]
+      [code, subject, title, type, userId, numberOfItems, status]
     )
 
     return result
@@ -366,10 +366,11 @@ export async function getExams({
       e.created_at,
       e.total_items,
       ek.answers,
+      e.status,
       CASE
         WHEN ek.id IS NULL THEN 'no answer key'
         ELSE 'has answer key'
-      END AS status
+      END AS key
     FROM exam e
     LEFT JOIN exam_answer_keys ek ON e.id = ek.exam_id
     ${whereClause}

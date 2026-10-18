@@ -34,7 +34,7 @@ const token = req.cookies.token
 const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
 
     try {
-        let { subject, title, type, numberOfItems} = req.body
+        let { subject, title, type, numberOfItems, status} = req.body
         
         if (subject != null) {
           subject = subject.toUpperCase();
@@ -50,7 +50,7 @@ const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
         return res.status(400).json({ error: "Subject is required" })
         }
 
-        const result = await createExam(subject, title, type, userId, numberOfItems)
+        const result = await createExam(subject, title, type, userId, numberOfItems, status)
 
         res.status(200).json({
         message: "Exam created successfully",
