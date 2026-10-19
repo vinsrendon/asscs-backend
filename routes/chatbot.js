@@ -28,7 +28,7 @@ router.get('/api/chat/health', async (req, res) => {
       contents: 'ping',
     })
 
-    if (response && response.text) {
+    if (response && response.text) {        
       return res.status(200).json({
         status: 'online',
         provider: 'Gemini API',
