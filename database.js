@@ -221,9 +221,28 @@ export async function getTotalUsers(){
     return count.rows
 }
 
-export async function editUser(query,values){
-    const result = await pool.query(query, values)
-    return result
+export async function editUser(queries) {
+  const client = await pool.connect()
+
+  try {
+    await client.query("BEGIN")
+
+    const results = []
+
+    for (const { query, values } of queries) {
+        const result = await client.query(query, values)
+        results.push(result)
+    }
+
+    await client.query("COMMIT")
+
+    return results
+  } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+  } finally {
+      client.release()
+  }
 }
 
 export async function getChatConversationById(uid){    

@@ -146,6 +146,7 @@ router.patch("/user/:uid",verifyToken, async(req,res) => {
     const { uid } = req.params
     const { email, phone,password, status } = req.body
 
+    const queries = []
     const fields = []
     const values = []
 
@@ -156,43 +157,73 @@ router.patch("/user/:uid",verifyToken, async(req,res) => {
         values.push(email)
     }
 
-    if (phone !== undefined) {
-        fields.push(`phone = $${index++}`)
-        values.push(phone)
-    }
-
     if (status !== undefined) {
         fields.push(`status = $${index++}`)
         values.push(status)
     }
 
     if (password !== undefined) {
+        if (typeof password !== "string" || password.length < 8) {
+            return res.status(400).json({message: "Password must be at least 8 characters long"})
+        }
+
         fields.push(`password = $${index++}`)
         const hash = await bcrypt.hash(password,13)
         values.push(hash)
     }
 
-    if (fields.length === 0) {
+    if (fields.length === 0 && phone === undefined) {
         return res.status(400).json({
             message: "No fields to update"
         })
     }
 
-    values.push(uid)
+    if (fields.length > 0) {
+        values.push(uid)
 
-    const query = `
-        UPDATE users
-        SET ${fields.join(", ")}
-        WHERE uid = $${index}
-        RETURNING *
-    `
+        queries.push({
+            query: `
+                UPDATE users
+                SET ${fields.join(", ")}
+                WHERE uid = $${index}
+                RETURNING uid
+            `,
+            values
+        })
+    }
+
+    if (phone !== undefined) {
+        queries.push({
+            query: `
+                UPDATE users_info
+                SET phone = $1
+                WHERE uid = $2
+                RETURNING uid
+            `,
+            values: [phone, uid]
+        })
+    }
 
     try {
-        await editUser(query, values)
-        res.status(200).json({ message: "User info successfully updated" })
+        const results = await editUser(queries)
+
+        for (const result of results) {
+            if (result.rowCount === 0) {
+                return res.status(404).json({
+                    message: "User or user info not found"
+                })
+            }
+        }
+
+        res.status(200).json({
+            message: "User info successfully updated"
+        })
     } catch (error) {
         console.error(error)
-        res.status(500).json({message: "Failed to update user"})
+
+        res.status(500).json({
+            message: "Failed to update user"
+        })
     }
 })
 
