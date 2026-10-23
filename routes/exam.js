@@ -6,7 +6,7 @@ const dotenv = require('dotenv')
 const {verifyToken} = require('./verify.js')
 
 
-const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults, getStudentExamStats, getStudentSubjectStrengths, getStudentGradeTrend, getStudentTakenExamResults, getStudentsByExamCode} = require('../database.js')
+const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults, getStudentExamStats, getStudentSubjectStrengths, getStudentGradeTrend, getStudentTakenExamResults, getStudentsByExamCode, toggleExamStatus, getActiveExamCount, getAverageScore} = require('../database.js')
 
 router.get('/exams', verifyToken, async (req, res) => {
     try {
@@ -244,7 +244,6 @@ router.get('/student/taken-exams', verifyToken, async (req, res) => {
   }
 })
 
-
 router.get('/exam/:examCode/students',verifyToken,async (req, res) => {
   try {
       const { examCode } = req.params
@@ -270,6 +269,58 @@ router.get('/exam/:examCode/students',verifyToken,async (req, res) => {
           message: 'Failed to retrieve students for this exam.'
       })
   }
+})
+
+router.patch('/exam/:id/status', verifyToken, async (req, res) => {
+    try {
+        const examId = Number(req.params.id)
+
+        if (!Number.isInteger(examId) || examId < 1) {
+            return res.status(400).json({
+                message: 'Invalid exam ID'
+            })
+        }
+
+        const result = await toggleExamStatus(examId)
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({
+                message: 'Exam not found'
+            })
+        }
+
+        return res.status(200).json({
+            message: 'Exam status updated successfully',
+            exam: result.rows[0]
+        })
+
+    } catch (err) {
+        console.error('Failed to update exam status:', err)
+
+        return res.status(500).json({
+            message: 'Failed to update exam status'
+        })
+    }
+})
+
+router.get('/dashboard/stats', verifyToken, async (req, res) => {
+    try {
+        const [activeExams, averageScore] = await Promise.all([
+            getActiveExamCount(),
+            getAverageScore()
+        ])
+
+        return res.status(200).json({
+            active_exam_count: activeExams.active_exam_count,
+            average_score: Number(averageScore.average_score)
+        })
+    } catch (err) {
+        console.error('Failed to retrieve dashboard statistics:', err)
+
+        return res.status(500).json({
+            message: 'Failed to retrieve dashboard statistics'
+        })
+    }
 })
 
 

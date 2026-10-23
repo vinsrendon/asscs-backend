@@ -941,5 +941,40 @@ export async function getStudentsByExamCode(examCode) {
     return result.rows
 }
 
+export async function toggleExamStatus(examId) {
+    const result = await pool.query(
+        `
+        UPDATE exam
+        SET status = CASE
+            WHEN UPPER(status::text) = 'ACTIVE' THEN 'INACTIVE'
+            ELSE 'ACTIVE'
+        END
+        WHERE id = $1
+        RETURNING id, code, title, subject, status
+        `,
+        [examId]
+    )
+
+    return result
+}
+
+export async function getActiveExamCount() {
+    const result = await pool.query(`
+        SELECT COUNT(*)::int AS active_exam_count
+        FROM exam
+        WHERE UPPER(status::text) = 'ACTIVE'
+    `)
+
+    return result.rows[0]
+}
+
+export async function getAverageScore() {
+    const result = await pool.query(`
+        SELECT COALESCE(ROUND(AVG(score)::numeric, 2), 0) AS average_score
+        FROM results
+    `)
+
+    return result.rows[0]
+}
 
 export default pool
