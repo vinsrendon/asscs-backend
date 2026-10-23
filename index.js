@@ -5,6 +5,7 @@ const dotenv = require('dotenv')
 const pool = require('./database')
 const fs = require('fs')
 const https = require('https')
+const os = require('os')
 
 const allowedOrigins = process.env.ALLOW_ORIGINS? process.env.ALLOW_ORIGINS.split(',').map(origin => origin.trim()): []
 const mode = process.env.MODE
@@ -58,12 +59,25 @@ const PORT = 8080
 // app.listen(PORT, ()=>{
 //     console.log(`SERVER IS RUNNING ON https://localhost:${PORT}`)
 // })
+
+function getLocalIP() {
+    const interfaces = os.networkInterfaces()
+
+    for (const name of Object.keys(interfaces)) {
+        for (const net of interfaces[name] || []) {
+            if (net.family === 'IPv4' && !net.internal) {
+                return net.address
+            }
+        }
+    }
+
+    return 'localhost'
+}
+const localIP = getLocalIP()
 https.createServer(
     httpsOptions,
     app
 ).listen(PORT, '0.0.0.0', () => {
-    console.log(
-      `HTTPS server running at https://192.168.254.108:${PORT}`
-    )
+    console.log(`HTTPS server running at https://${localIP}:${PORT}`)
 })
 
