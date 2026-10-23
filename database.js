@@ -273,75 +273,150 @@ export async function createExam(subject, title, type, userId, numberOfItems, st
     - Subject exam   → MATH-[YEAR]-0001
     - Entrance exam  → ENTRANCE-[YEAR]-0001
  */
+// async function generateExamCode(subject, title = "", type = "SUBJECT") {
+//   const year = new Date().getFullYear()
+
+//   let base
+
+//   // ===== ENTRANCE EXAM =====
+//   if (type === "ENTRANCE") {
+//     base = "ENTRANCE"
+//   } 
+//   // ===== SUBJECT EXAM =====
+//   else {
+//     // Create abbreviation from subject/title
+//     base = (subject || title || "EXAM")
+//       .toUpperCase()
+//       .replace(/[^A-Z0-9\s]/g, "")
+//       .trim()
+//       .split(/\s+/)
+//       .map(word => word.slice(0, 3))
+//       .join("")
+//       .slice(0, 8)
+
+//     // Common overrides
+//     const commonMap = {
+//       'MATHEMATICS': "MATH",
+//       'MATH': "MATH",
+//       'ENGLISH': "ENG",
+//       'PHYSICS': "PHY",
+//       'CHEMISTRY': "CHEM",
+//       'BIOLOGY': "BIO",
+//       'SCIENCE': "SCI",
+//       'COMPUTER PROGRAMMING': "COMPROG",
+//       'APPLICATIONS DEVELOPEMENT': "APPSDEV",
+//     }
+
+//     const fullText = `${subject} ${title}`.toUpperCase()
+//     for (const [key, abbr] of Object.entries(commonMap)) {
+//       if (fullText.includes(key)) {
+//         base = abbr
+//         break
+//       }
+//     }
+//   }
+
+//   const prefix = `${base}${year}`   // e.g. MATH2025
+
+//   // ----- Get next sequential number -----
+//   const result = await pool.query(
+//     `
+//     SELECT code 
+//     FROM exam
+//     WHERE code LIKE $1
+//     ORDER BY code DESC
+//     LIMIT 1
+//     `,
+//     [`${prefix}%`]                 // matches MATH20250001, MATH20250002, ...
+//   )
+
+//   let nextNumber = 1
+
+//   if (result.rows.length > 0) {
+//     const lastCode = result.rows[0].code
+//     // Extract the last 4 digits
+//     const lastNumber = parseInt(lastCode.slice(-4), 10)
+//     nextNumber = lastNumber + 1
+//   }
+
+//   const numberPart = String(nextNumber).padStart(4, "0")
+
+//   return `${prefix}${numberPart}`   // MATH20250001
+// }
 async function generateExamCode(subject, title = "", type = "SUBJECT") {
-  const year = new Date().getFullYear()
+  const year = String(new Date().getFullYear()).slice(-2)
 
   let base
 
   // ===== ENTRANCE EXAM =====
   if (type === "ENTRANCE") {
-    base = "ENTRANCE"
+    base = "EN"
   } 
-  // ===== SUBJECT EXAM =====
   else {
-    // Create abbreviation from subject/title
-    base = (subject || title || "EXAM")
-      .toUpperCase()
-      .replace(/[^A-Z0-9\s]/g, "")
-      .trim()
-      .split(/\s+/)
-      .map(word => word.slice(0, 3))
-      .join("")
-      .slice(0, 8)
-
-    // Common overrides
     const commonMap = {
-      'MATHEMATICS': "MATH",
-      'MATH': "MATH",
-      'ENGLISH': "ENG",
-      'PHYSICS': "PHY",
-      'CHEMISTRY': "CHEM",
-      'BIOLOGY': "BIO",
-      'SCIENCE': "SCI",
-      'COMPUTER PROGRAMMING': "COMPROG",
-      'APPLICATIONS DEVELOPEMENT': "APPSDEV",
+      MATHEMATICS: "MA",
+      MATH: "MA",
+      ENGLISH: "EN",
+      PHYSICS: "PH",
+      CHEMISTRY: "CH",
+      BIOLOGY: "BI",
+      SCIENCE: "SC",
+      "COMPUTER PROGRAMMING": "CP",
+      "APPLICATIONS DEVELOPEMENT": "AD",
     }
 
-    const fullText = `${subject} ${title}`.toUpperCase()
+    const fullText = `${subject || ""} ${title || ""}`.toUpperCase()
+
+    base = "EX"
+
     for (const [key, abbr] of Object.entries(commonMap)) {
       if (fullText.includes(key)) {
         base = abbr
         break
       }
     }
+
+    // Generate abbreviation if no common subject matches
+    if (base === "EX") {
+      base = (subject || title || "EXAM")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 2)
+        .padEnd(2, "X")
+    }
   }
 
-  const prefix = `${base}${year}`   // e.g. MATH2025
+  // Format: MA26
+  const prefix = `${base}${year}`
 
-  // ----- Get next sequential number -----
   const result = await pool.query(
     `
-    SELECT code 
+    SELECT code
     FROM exam
     WHERE code LIKE $1
     ORDER BY code DESC
     LIMIT 1
     `,
-    [`${prefix}%`]                 // matches MATH20250001, MATH20250002, ...
+    [`${prefix}%`]
   )
 
   let nextNumber = 1
 
   if (result.rows.length > 0) {
     const lastCode = result.rows[0].code
-    // Extract the last 4 digits
     const lastNumber = parseInt(lastCode.slice(-4), 10)
+
     nextNumber = lastNumber + 1
+  }
+
+  if (nextNumber > 9999) {
+    throw new Error(`Maximum exam codes reached for ${prefix}`)
   }
 
   const numberPart = String(nextNumber).padStart(4, "0")
 
-  return `${prefix}${numberPart}`   // MATH20250001
+  // Exactly 8 characters
+  return `${prefix}${numberPart}`
 }
 
 export async function getExams({
@@ -826,5 +901,45 @@ export async function getStudentTakenExamResults(uid) {
     throw err
   }
 }
+
+export async function getStudentsByExamCode(examCode) {
+    const cleanExamCode = String(examCode).trim().toUpperCase()
+
+    const result = await pool.query(
+        `
+        SELECT
+            r.id AS result_id,
+            r.student_id,
+            ui.fname,
+            ui.mname,
+            ui.lname,
+            ui.course,
+            r.score,
+            r.answers,
+            e.id AS exam_id,
+            e.code AS exam_code,
+            e.title AS exam_title,
+            e.subject,
+            e.type,
+            e.total_items
+        FROM results r
+        JOIN exam e
+            ON e.id = r.exam_id
+        LEFT JOIN users_info ui
+            ON (
+                ui.student_id::text = r.student_id::text
+                OR ui.applicant_id::text = r.student_id::text
+            )
+        WHERE UPPER(TRIM(e.code)) = $1
+        ORDER BY ui.lname ASC NULLS LAST,
+                 ui.fname ASC NULLS LAST,
+                 r.student_id ASC
+        `,
+        [cleanExamCode]
+    )
+
+    return result.rows
+}
+
 
 export default pool

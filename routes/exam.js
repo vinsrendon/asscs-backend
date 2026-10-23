@@ -6,7 +6,7 @@ const dotenv = require('dotenv')
 const {verifyToken} = require('./verify.js')
 
 
-const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults, getStudentExamStats, getStudentSubjectStrengths, getStudentGradeTrend, getStudentTakenExamResults} = require('../database.js')
+const  { createExam, getExams, deleteExam, uploadAnswerKey, gradeAndSaveResult, getStudentResults, getStudentExamStats, getStudentSubjectStrengths, getStudentGradeTrend, getStudentTakenExamResults, getStudentsByExamCode} = require('../database.js')
 
 router.get('/exams', verifyToken, async (req, res) => {
     try {
@@ -241,6 +241,34 @@ router.get('/student/taken-exams', verifyToken, async (req, res) => {
       message: 'Failed to retrieve taken exam results',
       error: err.message
     })
+  }
+})
+
+
+router.get('/exam/:examCode/students',verifyToken,async (req, res) => {
+  try {
+      const { examCode } = req.params
+
+      if (!examCode?.trim()) {
+          return res.status(400).json({
+              message: 'Exam code is required.'
+          })
+      }
+
+      const students = await getStudentsByExamCode(examCode)
+
+      return res.status(200).json({
+          success: true,
+          examCode: examCode.toUpperCase(),
+          total: students.length,
+          students
+      })
+  } catch (err) {
+      console.error('Failed to retrieve exam students:', err)
+
+      return res.status(500).json({
+          message: 'Failed to retrieve students for this exam.'
+      })
   }
 })
 
