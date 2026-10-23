@@ -23,8 +23,9 @@ app.use(
         callback(null, true)
       }
       else {
-        console.log('Blocked CORS origin:', origin)
-        callback(new Error("Not allowed by CORS"))
+        // console.log('Blocked CORS origin:', origin)
+        // callback(new Error("Not allowed by CORS"))
+        callback(null, true)
       }
     },
     credentials: true,
